@@ -9,7 +9,7 @@ library(data.table)
 library(dplyr)
 library(DT)
 library(plyr)
-
+library(scales)
 
 #Load collections
 collections = c("intwash_facilities", "intwash_orders_subprocesses",
@@ -61,5 +61,56 @@ df <- merge(x = df, y = df_deliveries, by = "dropOff", all.x = T)
 colnames(df_facility) <- c("facility","name")
 
 df <- merge(x = df, y = df_facility, by = "facility", all.x = T)
+
+#Make a subset
+df_subset <- df[,c("customer","state","createdAt","name")]
+#Make a data table
+df_subset <- data.table(df_subset)
+
+df_subset$isvalid = 1 #initialize isvalid
+df_subset$isvalid[which(df_subset$state %in% c("new","payment_authorisation_error",
+                                                   "canceled","reserved"))] = 0 #adjust
+
+firstOrder <- df_subset[isvalid==1,min(createdAt),by=.(customer)]
+#Merge back
+df_subset <- merge(x = df_subset, y = firstOrder, by="customer",all.x = T)
+
+df_subset$createdAt <- as.Date(df_subset$createdAt,"%Y-%m-%d")
+
+df_subset$createdAt <- as.Date(df_subset$createdAt, "%Y-%m-%d")
+colnames(df_subset)[names(df_subset)=="V1"] <- "firstOrder"
+df_subset$firstOrder <- as.Date(df_subset$firstOrder, "%Y-%m-%d")
+
+df_subset$customerStatus = 0
+df_subset$customerStatus[which(df_subset$createdAt>df_subset$firstOrder)] <- 1
+
+
+df_subset$sinceFirstOrder <- 12 * as.numeric((as.yearmon(df_subset$createdAt)-as.yearmon(df_subset$firstOrder)))
+df_subset$initialcohort <-as.yearmon(df_subset$firstOrder)
+
+#Make a subset of only completed orders
+nsubset <- df_subset[df_subset$state == 'completed']
+
+#Take the first facility
+firstFacility <- nsubset[customerStatus==0,name,by=.(customer)]
+
+#Merge back to nsubset
+nsubset <- merge(x = nsubset, y = firstFacility, by="customer",all.x = T)
+colnames(nsubset)[names(nsubset)=='name.y'] <- "firstFacility"
+
+y = arrange(nsubset[customerStatus==0, .(length(unique(customer))), by=.(initialcohort,firstFacility)],desc(initialcohort))
+x = arrange(nsubset[customerStatus==1, .(length(unique(customer))), 
+                    by=.(initialcohort, sinceFirstOrder,firstFacility)],desc(sinceFirstOrder))
+
+colnames(y) <- c("initialcohort","firstFacility","cohort")
+colnames(x) <- c("initialcohort","sinceFirstOrder","firstFacility","returning")
+
+x = merge(x = x, y = y, by = c("initialcohort","firstFacility"),all.x = T)
+x <- na.omit(x)
+x$sinceFirstOrder <- as.integer(x$sinceFirstOrder)
+
+
+write.csv(x, file = "/home/dima/powerbi-share/R_outputs/facilitycohorts.csv",row.names = F)
+
 
 
