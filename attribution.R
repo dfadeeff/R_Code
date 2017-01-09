@@ -5,6 +5,7 @@ setwd("/home/dima/Automation/Reports/Cohorts")
 rm(list = ls(all=TRUE))
 
 #Load libraries
+library(mongolite)
 library(zoo)
 library(DT)
 library(data.table)
@@ -31,7 +32,7 @@ funnel <- funnel[,c("order_reference","first_channel","last_channel")]
 colnames(funnel)[1] <- c("reference")
 
 orders <- orders_table[,c("customer","voucherCode","reference","createdAt",
-                          "state","locationIdentifier")]
+                          "state","locationIdentifier","createdBy.userAgent")]
 
 #Load voucher channels
 collections = c("intwash_voucher_blocks","intwash_voucher_campaigns",
@@ -39,15 +40,15 @@ collections = c("intwash_voucher_blocks","intwash_voucher_campaigns",
 
 blocks <- mongo(collection = collections[1], db = "uk_live", 
                 url = "mongodb://172.31.51.215:27017",verbose = TRUE)
-campaigns <- mongo(collection = collections[2], db="uk_live",
-                   url = "mongodb://172.31.51.215:27017",verbose = TRUE )
+#campaigns <- mongo(collection = collections[2], db="uk_live",
+#                   url = "mongodb://172.31.51.215:27017",verbose = TRUE )
 items <- mongo(collection = collections[3], db = "uk_live", 
                 url = "mongodb://172.31.51.215:27017",verbose = TRUE)
 models <- mongo(collection = collections[4], db="uk_live",
                    url = "mongodb://172.31.51.215:27017",verbose = TRUE )
 
 df_blocks <- blocks$find(fields = '{"campaignId":1,"reference":1,"name":1}')
-df_campaigns <- campaigns$find(fields = '{"name":1, "reference":1}')
+#df_campaigns <- campaigns$find(fields = '{"name":1, "reference":1}')
 df_items <- items$find(fields = '{"_id":1,"code":1,"modelId":1}')
 df_models <- models$find(fields = '{"_id":1,"blockId":1,"template":1}')
  
@@ -114,6 +115,14 @@ orders <- merge(x = orders, y = df_items[,c("voucherCode","final_channel")], by 
 
 #Work with export from Google Analytics
 funnel <- funnel[!duplicated(funnel),]
+length(unique(funnel$reference))
+
+#Transform to data table and make unique inputs
+funnel <- data.table(funnel)
+funnel <- funnel[,.(min(first_channel),min(last_channel)),by = .(reference)]
+colnames(funnel) <- c("reference","first_channel","last_channel")
+
+#Merge back to orders
 orders <- merge(x = orders, y = funnel, by = "reference", all.x = T)
 colnames(orders)[names(orders)=="final_channel"] <- "voucher_channel"
 
@@ -121,9 +130,10 @@ colnames(orders)[names(orders)=="final_channel"] <- "voucher_channel"
 orders$first_channel <- as.character(orders$first_channel)
 orders$last_channel <- as.character(orders$last_channel)
 
-orders[,c(7:9)][is.na(orders[,c(7:9)])] <- "not set"
-orders[,c(8:9)][(orders[,c(8:9)])=="(unavailable)"] <- "not set"
+orders[,c(8:10)][is.na(orders[,c(8:10)])] <- "not set"
+orders[,c(8:10)][(orders[,c(8:10)])=="(unavailable)"] <- "not set"
 
+#Attach weights for voucher channel, first and last channel
 orders$voucherScore <- 1
 orders$voucherScore[which(orders$voucher_channel == "not set")] <- 0
 orders$voucherScore[which(orders$first_channel == "not set" & orders$last_channel != "not set" & orders$voucher_channel != "not set")] <- 0.5
@@ -131,11 +141,93 @@ orders$voucherScore[which(orders$first_channel == "not set" & orders$last_channe
 orders$voucherScore[which(orders$first_channel != "not set" & orders$last_channel == "not set" & orders$voucher_channel != "not set")] <- 0.5
 orders$voucherScore[which(orders$first_channel != "not set" & orders$last_channel != "not set" & orders$voucher_channel != "not set")] <- 0.33
 
+orders$firstScore <- 1
+orders$firstScore[which(orders$first_channel == "not set")] <- 0
+orders$firstScore[which(orders$voucher_channel == "not set" & orders$last_channel != "not set" & orders$first_channel != "not set")] <- 0.5
+orders$firstScore[which(orders$voucher_channel == "not set" & orders$last_channel == "not set" & orders$first_channel != "not set")] <- 1
+orders$firstScore[which(orders$voucher_channel != "not set" & orders$last_channel == "not set" & orders$first_channel != "not set")] <- 0.5
+orders$firstScore[which(orders$voucher_channel != "not set" & orders$last_channel != "not set" & orders$first_channel != "not set")] <- 0.33
+
+orders$lastScore <- 1
+orders$lastScore[which(orders$last_channel == "not set")] <- 0
+orders$lastScore[which(orders$voucher_channel == "not set" & orders$first_channel != "not set" & orders$last_channel != "not set")] <- 0.5
+orders$lastScore[which(orders$voucher_channel == "not set" & orders$first_channel == "not set" & orders$last_channel != "not set")] <- 1
+orders$lastScore[which(orders$voucher_channel != "not set" & orders$first_channel == "not set" & orders$last_channel != "not set")] <- 0.5
+orders$lastScore[which(orders$voucher_channel != "not set" & orders$first_channel != "not set" & orders$last_channel != "not set")] <- 0.33
+
+#Rest channel
+orders$trackedScore <- orders$voucherScore + orders$firstScore + orders$lastScore
+orders$restScore <-  1 - orders$trackedScore 
+orders$nottracked_channel <- "not set"
+
+
+#Subset df as weights
+weights <- orders[,c("reference","voucher_channel","first_channel","last_channel","nottracked_channel",
+                     "voucherScore","firstScore","lastScore","restScore")]
+class(weights)
+weights <- data.table(weights)
+str(weights)
+#####################################
+## Converting from wide to long and long to wide
+## Reshaping function for data tables:
+# from wide to long "melt"
+# from long to wide "dcast"
+#####################################
+
+colA = names(weights)[2:5]
+colB = names(weights)[6:9]
+weights_long = melt(weights, measure = list(colA, colB), value.name = "reference")
+colnames(weights_long) <- c("reference","var","channel","weight")
 
 
 
+#Assign final channel
+weights_long$final_channel <- weights_long$channel
+organic = c("SEO","Organic Search")
+weights_long$final_channel[which(sapply(paste(organic,collapse = "|"), function(x) grepl(x,weights_long$channel))==TRUE)] <- "SEO"
+nonorganic = c("SEM","Paid Search")
+weights_long$final_channel[which(sapply(paste(nonorganic,collapse = "|"), function(x) grepl(x,weights_long$channel))==TRUE)] <- "SEM"
+referral = c("Refer a Friend","Referral","Refer")
+weights_long$final_channel[which(sapply(paste(referral,collapse = "|"), function(x) grepl(x,weights_long$channel))==TRUE)] <- "Refer a Friend"
+crmj = c("email","Email","Journey")
+weights_long$final_channel[which(sapply(paste(crmj,collapse = "|"), function(x) grepl(x,weights_long$channel))==TRUE)] <- "CRM-Journey"
+social_network = c("Facebook","Network")
+weights_long$final_channel[which(sapply(paste(social_network,collapse = "|"), function(x) grepl(x,weights_long$channel))==TRUE)] <- "Facebook"
 
 
 
+#Combine with the new split of channels
+mixed_df <- weights_long[,.(sum(weight)),by = .(reference,final_channel)]
+colnames(mixed_df)[3] <- c("sum_weight")
+sum(mixed_df$sum_weight)
+
+#Merge with data from orders
+mixed_df <- merge(x = mixed_df, y = orders[,c("reference","createdAt","state",
+                                              "locationIdentifier","createdBy.userAgent","customer")],by="reference",all.x = T)
 
 
+#Add isvalid column (first, initialize default value, then, adjust by particular state)
+mixed_df$isvalid = 1 #initialize isvalid
+mixed_df$isvalid[which(mixed_df$state %in% c("new","payment_authorisation_error",
+                                                    "canceled","reserved"))] = 0 
+
+mixed_df$device <- NA
+mixed_df$device[(grepl("iPhone",mixed_df$createdBy.userAgent)==T)] = "iOS app"
+mixed_df$device[(grepl("Android",mixed_df$createdBy.userAgent)==T)] = "android app"
+mixed_df$device[(!is.na(mixed_df$createdBy.userAgent) 
+                     & !grepl("^(iOS)",mixed_df$device) 
+                     & !grepl("^(android)",mixed_df$device))] = "web app"
+
+
+#Find Status by getting first order
+firstOrder <- mixed_df[isvalid==1,.(min(createdAt)),by=.(customer)]
+mixed_df <- merge(x = mixed_df, y = firstOrder, by = "customer",all.x = T)
+colnames(mixed_df)[11] <- "firstOrder"
+
+mixed_df$customerStatus = "New"
+mixed_df$customerStatus[which(mixed_df$createdAt > mixed_df$firstOrder)] <- "Returning"
+mixed_df$createdAt <- as.Date(mixed_df$createdAt, format = "%Y-%m-%d")
+mixed_df$firstOrder <- as.Date(mixed_df$firstOrder, "%Y-%m-%d")
+
+#Write to specific folder
+write.csv(mixed_df, file="/home/dima/powerbi-share/R_outputs/attribution.csv",row.names = FALSE)
