@@ -10,6 +10,7 @@ library(data.table)
 library(dplyr)
 library(DT)
 library(plyr)
+library(jsonlite)
 
 
 #####################
@@ -188,12 +189,19 @@ df_subset$initialcohort <-as.yearmon(df_subset$firstOrder)
 #Make a subset of only completed orders
 nsubset <- df_subset[df_subset$state == 'completed']
 
-#Take the first channel
-firstChannel <- nsubset[customerStatus==0,mrkt_channel,by=.(customer)]
+length(unique(nsubset$customer))
+sum(nsubset$isvalid)
+
+#Take the first channel!
+firstChannel <- nsubset[customerStatus==0, min(mrkt_channel) ,by=.(customer)]
+colnames(firstChannel)[names(firstChannel)=="V1"] <- "firstChannel"
+
+#Check uniqueness
+length(unique(firstChannel$customer))
 
 #Merge back to nsubset
 nsubset <- merge(x = nsubset, y = firstChannel, by="customer",all.x = T)
-colnames(nsubset)[names(nsubset)=='mrkt_channel.y'] <- "firstChannel"
+
 
 #Arrange the datasets
 y = arrange(nsubset[customerStatus==0, .(length(unique(customer))), by=.(initialcohort,firstChannel)],desc(initialcohort))
@@ -203,10 +211,16 @@ x = arrange(nsubset[customerStatus==1, .(length(unique(customer))),
 #Rename the col names
 colnames(y) <- c("initialcohort","firstChannel","cohort")
 colnames(x) <- c("initialcohort","sinceFirstOrder","firstChannel","returning")
+class(x)
+class(y)
+
+#Append variables from Y, i.e. initial cohort numbers
+z = merge(x = x, y = y, by = c("initialcohort","firstChannel"),all.x = T)
+z$cohort[is.na(z$cohort)] <- 0
+
+#Check NA in z
+sum(is.na(z$cohort))
+
+write.csv(z, file = "/home/dima/powerbi-share/R_outputs/channelcohorts.csv",row.names = FALSE)
 
 
-x = merge(x = x, y = y, by = c("initialcohort","firstChannel"),all.x = T)
-x <- na.omit(x)
-x$sinceFirstOrder <- as.integer(x$sinceFirstOrder)
-
-write.csv(x, file = "/home/dima/powerbi-share/R_outputs/channelcohorts.csv",row.names = FALSE)
