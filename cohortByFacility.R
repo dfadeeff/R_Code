@@ -9,7 +9,7 @@ library(data.table)
 library(dplyr)
 library(DT)
 library(plyr)
-library(scales)
+
 
 #Load collections
 collections = c("intwash_facilities", "intwash_orders_subprocesses",
@@ -92,11 +92,16 @@ df_subset$initialcohort <-as.yearmon(df_subset$firstOrder)
 nsubset <- df_subset[df_subset$state == 'completed']
 
 #Take the first facility
-firstFacility <- nsubset[customerStatus==0,name,by=.(customer)]
+firstFacility <- nsubset[customerStatus==0,min(name),by=.(customer)]
+colnames(firstFacility)[names(firstFacility)=='V1'] <- "firstFacility"
+
+#Check uniqueness
+length(unique(firstFacility$customer))
+
 
 #Merge back to nsubset
-nsubset <- merge(x = nsubset, y = firstFacility, by="customer",all.x = T)
-colnames(nsubset)[names(nsubset)=='name.y'] <- "firstFacility"
+nsubset <- merge(x = nsubset, y = firstFacility, by="customer", all.x = T)
+
 
 y = arrange(nsubset[customerStatus==0, .(length(unique(customer))), by=.(initialcohort,firstFacility)],desc(initialcohort))
 x = arrange(nsubset[customerStatus==1, .(length(unique(customer))), 
@@ -104,13 +109,17 @@ x = arrange(nsubset[customerStatus==1, .(length(unique(customer))),
 
 colnames(y) <- c("initialcohort","firstFacility","cohort")
 colnames(x) <- c("initialcohort","sinceFirstOrder","firstFacility","returning")
+class(x)
+class(y)
 
-x = merge(x = x, y = y, by = c("initialcohort","firstFacility"),all.x = T)
-x <- na.omit(x)
-x$sinceFirstOrder <- as.integer(x$sinceFirstOrder)
+z = merge(x = x, y = y, by = c("initialcohort","firstFacility"),all.x = T)
+z$cohort[is.na(z$cohort)] <- 0
+
+#Check NA in z
+sum(is.na(z$cohort))
 
 
-write.csv(x, file = "/home/dima/powerbi-share/R_outputs/facilitycohorts.csv",row.names = F)
+write.csv(z, file = "/home/dima/powerbi-share/R_outputs/facilitycohorts.csv",row.names = FALSE)
 
 
 
