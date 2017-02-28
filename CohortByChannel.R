@@ -180,7 +180,7 @@ orders$customerStatus[which(orders$createdAt > orders$firstOrder)] <- 1
 
 
 #Make a subset
-df_subset <- orders[, .(customer,state,createdAt,mrkt_channel,isvalid,customerStatus,firstOrder)]
+df_subset <- orders[, .(customer,state,createdAt,mrkt_channel,isvalid,customerStatus,firstOrder,locationIdentifier)]
 
 #Calculate difference btw first Order and subsequent orders in months and initial cohort
 df_subset$sinceFirstOrder <- 12 * as.numeric((as.yearmon(df_subset$createdAt)-as.yearmon(df_subset$firstOrder)))
@@ -204,23 +204,24 @@ nsubset <- merge(x = nsubset, y = firstChannel, by="customer",all.x = T)
 
 
 #Arrange the datasets
-y = arrange(nsubset[customerStatus==0, .(length(unique(customer))), by=.(initialcohort,firstChannel)],desc(initialcohort))
+y = arrange(nsubset[customerStatus==0, .(length(unique(customer))), by=.(initialcohort, firstChannel, locationIdentifier)],desc(initialcohort))
 x = arrange(nsubset[customerStatus==1, .(length(unique(customer))), 
-                    by=.(initialcohort, sinceFirstOrder,firstChannel)],desc(sinceFirstOrder))
+                    by=.(initialcohort, sinceFirstOrder, firstChannel,locationIdentifier)],desc(sinceFirstOrder))
 
 #Rename the col names
-colnames(y) <- c("initialcohort","firstChannel","cohort")
-colnames(x) <- c("initialcohort","sinceFirstOrder","firstChannel","returning")
+colnames(y) <- c("initialcohort","firstChannel","location","cohort")
+colnames(x) <- c("initialcohort","sinceFirstOrder","firstChannel","location","returning")
 class(x)
 class(y)
 
 #Append variables from Y, i.e. initial cohort numbers
-z = merge(x = x, y = y, by = c("initialcohort","firstChannel"),all.x = T)
+z = merge(x = x, y = y, by = c("initialcohort","firstChannel", "location"),all.x = T)
 z$cohort[is.na(z$cohort)] <- 0
 
 #Check NA in z
 sum(is.na(z$cohort))
-
+names(z)
 write.csv(z, file = "/home/dima/powerbi-share/R_outputs/channelcohorts.csv",row.names = FALSE)
+
 
 
