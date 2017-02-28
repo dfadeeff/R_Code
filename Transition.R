@@ -15,6 +15,7 @@ library(dplyr)
 library(mongolite)
 library(jsonlite)
 library(ggplot2)
+library(data.table)
 
 
 #Open connection
@@ -32,10 +33,19 @@ length(unique(orders_data$reference))
 customers <- customers$find(fields = '{"_id":1,"reference":1,"internalData.segmentation":1}')
 length(unique(customers$reference))
 
+#Flatten and reshuffle columns
+orders_data <- flatten(orders_data)
+orders_data <- orders_data[,c(1,3,4,2,5,6)]
+
+#Flatten and reshuffle columns, rename
+customers <- flatten(customers)
+customers <- customers[,c(1,3,2)]
 colnames(customers) <- c("customer","segmentation","reference")
+
+
 orders_data <- merge(x=orders_data,y=customers,by="customer",all.x = TRUE)
 orders_data <- orders_data[,c(8,3:7)]
-colnames(orders_data) <- c("customer","state","order","createdAt","location", "segmentation")
+colnames(orders_data) <- c("customer","order", "createdAt", "state", "location", "segmentation")
 
 #Check classes
 str(orders_data)
@@ -62,7 +72,8 @@ startLastMonth <- som(som(Sys.Date())-1)
 ########################################################################
 #Now I take 2 datasets, sliced by startThisMonth and startLastMonth
 ########################################################################
-orders_dataBeforeLastMonth <- subset(orders_data,orders_data$createdAt <= startLastMonth)
+
+orders_dataBeforeLastMonth <- subset(orders_data, orders_data$createdAt <= startLastMonth)
 orders_dataLastMonth <- subset(orders_data,
                                orders_data$createdAt > startLastMonth & 
                                orders_data$createdAt <= startThisMonth)
@@ -158,8 +169,25 @@ x = prop.table(transition,1)*100 #percentages by row
 #prop.table(transition,2) #percentrage by column
 rownames(x) = paste(rownames(x),"Existing",sep = "In")
 colnames(x) = paste(colnames(x),"New",sep = "In")
-x
-write.csv(CombinedDT,"/home/dima/sisense_share/Cohorts/transition.csv")
+
+#Check unique customers in final dataset
+length(unique(CombinedDT$customer))
+
+#Add a city to that dataset
+unique_cust <- CombinedDT[,.(customer)]
+
+#Aggregation
+grouped_by_city <- orders_data[,list(location[1]), by=customer]
+
+#Check unique values for customers
+length(unique(grouped_by_city$customer))
+colnames(grouped_by_city) <- c("customer","location")
+
+#Merge back to final dataset
+CombinedDT <- merge(x = CombinedDT,y = grouped_by_city, by = "customer", all.x = TRUE)
+
+
+write.csv(CombinedDT,"/home/dima/powerbi-share/R_outputs/transition.csv",row.names = F)
 
 #Sum of all customers
 sum(transition)
