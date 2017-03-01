@@ -47,7 +47,7 @@ unique_cust$lifespan <- difftime(time1 = unique_cust$lastOrder,
 ##########################
 ## Compute average lifespan
 ##########################
-average_lifespan <- unique_cust[totalOrders > 1, mean(lifespan),]
+average_lifespan <- unique_cust[totalOrders > 1, median(lifespan),]
 lifespanbycity = unique_cust[totalOrders >1,median(lifespan),by=location]
 colnames(lifespanbycity) <- c("location","lifespan")
 lifespanbycity$lifespan <- as.numeric(lifespanbycity$lifespan)
@@ -88,3 +88,6 @@ str(orders_per_user)
 ## Get simple CLV
 ##########################
 orders_per_user$clv <- orders_per_user$aov*orders_per_user$finallifespan/30*orders_per_user$orderperuser
+orders_per_user$clv[which(is.na(orders_per_user$clv))] <- 0
+
+write.csv(orders_per_user,"/home/dima/powerbi-share/R_outputs/clv.csv",row.names = F)
