@@ -1,7 +1,12 @@
+
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio-server/bin/pandoc")
+
 rm(list = ls(all=TRUE))
 getwd()
-setwd("/home/dima/Automation/Reports/Cohorts")
+setwd("/home/bi_user/Automation/Reports/Cohorts")
 
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 #install.packages("data.table")
 #install.packages("dplyr")
 #install.packages("zoo")
@@ -96,7 +101,8 @@ clrs <- rgb(clrs(seq(0,1,length.out = length(brks)+1)),max=255)
 cohort_table <- datatable(output,extensions = list("Buttons"= NULL),options=list("paging"= F,"searching"=T,"autoWidth"= F, dom = 'Bfrtip',
                                                                  buttons = c( 'csv','excel')))%>%formatPercentage(c(2:ncol(output)),0)%>%formatStyle(c(2:ncol(output)),
                                                                  backgroundColor = styleInterval(brks, clrs))
-saveWidget(cohort_table, file="/home/dima/shinyserver/Cohorts/cohorts.html",selfcontained = TRUE)
+saveWidget(cohort_table, file="/home/bi_user/shinyserver/Cohorts/cohorts.html",selfcontained = TRUE)
+
 
 
 ########################################################################
@@ -139,6 +145,8 @@ cohortCities$number <- NULL
 
 #For every city, apply brute force conversion
 #London
+cohortCities <- data.table(cohortCities)
+
 cohortLondon <- cohortCities[cohortCities$city=='gb_london']
 cohortLondon <- arrange(dcast(cohortLondon, initialcohort~round(sinceFirstOrder),value.var = "percent"),initialcohort)
 cohortLondon = data.table(cohortLondon)
@@ -148,7 +156,7 @@ cohortLondon$initialcohort <- as.character(cohortLondon$initialcohort)
 cohort_table_London <- datatable(cohortLondon,extensions = list("Buttons"= NULL),options=list("paging"= F,"searching"=T,"autoWidth"= F, dom = 'Bfrtip',
                                                                                  buttons = c( 'csv','excel')))%>%formatPercentage(c(2:ncol(cohortLondon)),0)%>%formatStyle(c(2:ncol(cohortLondon)),
                                                                                  backgroundColor = styleInterval(brks, clrs))
-saveWidget(cohort_table_London, file="/home/dima/shinyserver/Cohorts/UserCohortsLondon.html",selfcontained = TRUE)
+saveWidget(cohort_table_London, file="/home/bi_user/shinyserver/Cohorts/UserCohortsLondon.html",selfcontained = TRUE)
 
 #Berlin
 cohortBerlin <- cohortCities[cohortCities$city=='de_berlin']
@@ -160,7 +168,7 @@ cohortBerlin$initialcohort <- as.character(cohortBerlin$initialcohort)
 cohort_table_Berlin <- datatable(cohortBerlin,extensions = list("Buttons"= NULL),options=list("paging"= F,"searching"=T,"autoWidth"= F, dom = 'Bfrtip',
                                                                                               buttons = c( 'csv','excel')))%>%formatPercentage(c(2:ncol(cohortBerlin)),0)%>%formatStyle(c(2:ncol(cohortBerlin)),
                                                                                                                                                                                         backgroundColor = styleInterval(brks, clrs))
-saveWidget(cohort_table_Berlin, file="/home/dima/shinyserver/Cohorts/UserCohortsBerlin.html",selfcontained = TRUE)
+saveWidget(cohort_table_Berlin, file="/home/bi_user/shinyserver/Cohorts/UserCohortsBerlin.html",selfcontained = TRUE)
 
 #Paris
 cohortParis <- cohortCities[cohortCities$city=='fr_paris']
@@ -171,7 +179,9 @@ cohortParis$initialcohort <- as.character(cohortParis$initialcohort)
 
 cohort_table_Paris <- datatable(cohortParis,extensions = list("Buttons"= NULL),options=list("paging"= F,"searching"=T,"autoWidth"= F, dom = 'Bfrtip',
                                                                                               buttons = c( 'csv','excel')))%>%formatPercentage(c(2:ncol(cohortParis)),0)%>%formatStyle(c(2:ncol(cohortParis)),
-                                                                                                                                                                                        backgroundColor = styleInterval(brks, clrs))
-saveWidget(cohort_table_Paris, file="/home/dima/shinyserver/Cohorts/UserCohortsParis.html",selfcontained = TRUE)
+                                                                                              backgroundColor = styleInterval(brks, clrs))
 
+#In order to write
+saveWidget(cohort_table_Paris, file ="UserCohortsParis.html",selfcontained = TRUE)
+file.rename("UserCohortsParis.html","/home/bi_user/shinyserver/Cohorts/UserCohortsParis.html")
 
