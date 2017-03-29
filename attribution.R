@@ -1,9 +1,11 @@
 #Set wd
 getwd()
-setwd("/home/dima/Automation/Reports/Cohorts")
+setwd("/home/bi_user/Automation/Reports/Cohorts")
 
 rm(list = ls(all=TRUE))
 
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 #Load libraries
 library(mongolite)
 library(zoo)
@@ -18,8 +20,8 @@ library(htmlwidgets)
 load("DataToCRM.dat")
 
 #Set the folders
-from_folder <- "/home/dima/powerbi-share/Attribution"
-to_folder <- "/home/dima/Automation/Reports/Cohorts/"
+from_folder <- "/home/bi_user/powerbi-share/Attribution"
+to_folder <- "/home/bi_user/Automation/Reports/Cohorts/"
 
 #Identify files
 list_files <- list.files(from_folder,"output.csv",full.names = T)
@@ -230,4 +232,6 @@ mixed_df$createdAt <- as.Date(mixed_df$createdAt, format = "%Y-%m-%d")
 mixed_df$firstOrder <- as.Date(mixed_df$firstOrder, "%Y-%m-%d")
 
 #Write to specific folder
-write.csv(mixed_df, file="/home/dima/powerbi-share/R_outputs/attribution.csv",row.names = FALSE)
+write.csv(mixed_df, file="/home/bi_user/powerbi-share/R_outputs/attribution.csv",row.names = FALSE)
+save(df_items,mixed_df, file = "/home/bi_user/Automation/Reports/Ad_hoc/DataToMrkt.dat")
+save(df_items,mixed_df, file = "/home/bi_user/Automation/Reports/Cohorts/DataToMrkt.dat")
