@@ -2,13 +2,16 @@
 ## Prepare the working env
 ##########################
 getwd()
-setwd("/home/dima/Automation/Reports/Stages")
+setwd("/home/bi_user/Automation/Reports/Stages")
 rm(list = ls(all=T))
 
 
 ##########################
 ## Load libraries
 ##########################
+
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 library(zoo)
 library(data.table)
 
@@ -122,4 +125,4 @@ orders_per_user$clv <- orders_per_user$aov*orders_per_user$finallifespan/30*orde
 orders_per_user[is.na(orders_per_user)] <- 0
 
 
-write.csv(orders_per_user,"/home/dima/powerbi-share/R_outputs/clv.csv",row.names = F)
+write.csv(orders_per_user,"/home/bi_user/powerbi-share/R_outputs/clv.csv",row.names = F)
