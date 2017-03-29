@@ -1,6 +1,9 @@
 rm(list = ls(all=TRUE))
 getwd()
-setwd("/home/dima/Automation/Reports/Cohorts")
+setwd("/home/bi_user/Automation/Reports/Cohorts")
+
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 
 library(zoo)
 library(mongolite)
@@ -119,7 +122,7 @@ z$cohort[is.na(z$cohort)] <- 0
 sum(is.na(z$cohort))
 
 
-write.csv(z, file = "/home/dima/powerbi-share/R_outputs/facilitycohorts.csv",row.names = FALSE)
+write.csv(z, file = "/home/bi_user/powerbi-share/R_outputs/facilitycohorts.csv",row.names = FALSE)
 
 
 
