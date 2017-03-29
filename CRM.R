@@ -2,9 +2,12 @@
 #Now perform CRM analysis
 ########################################################################################
 getwd()
-setwd("/home/dima/Automation/Reports/CRM")
+setwd("/home/bi_user/Automation/Reports/CRM")
 
 rm(list = ls(all=TRUE))
+
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 
 library(lubridate)
 library(zoo)
@@ -94,12 +97,28 @@ addresses <- merge(x = addresses[,1,with=F],y = adr_temp, by="id", all.x = T )
 #####################################################
 #Work with tags
 #####################################################
-tags <- customers_table[,c(1,11)]
-class(tags)
-colnames(tags) <- c("id","tags")
+names(customers_table)
+#tags <- customers_table[,c("_id","meta.tags")]
 #tags <- data.table(tags)
-#tags <- tags[, .(tagnames = names(unlist(meta.tags)), tagvalues = unlist(meta.tags)), by = id]
-tags <- as.data.table(tags)[,unlist(tags),by=id]
+
+#Rename columns in a list
+#colnames(tags) <- c("id","tags")
+
+#first_non_null_index_t <- which(!unlist(lapply(tags$tags,is.null)))
+#first_non_empty_list_t <- first_non_null_index_t[which(tags[first_non_null_index_t,lapply(tags,length)] != 0)[1]]
+
+#first_null_index_t <- which(unlist(lapply(tags$tags,is.null)))[1]
+
+#intermediate_tags <- tags[first_non_empty_list_t,] 
+#tags[first_null_index_t,] <- tags[first_non_empty_list_t,]
+#tags[first_non_empty_list_t,] <- intermediate_tags
+
+
+
+#tags <- tags[, .(tagnames = names(unlist(tags)), tagvalues = unlist(tags)), by = id]
+#tags <- tags[,lapply(tags, unlist),by=id]
+#tags <- flatten(tags)
+#tags$tags <- unlist(tags$tags)
 
 
 #####################################################
@@ -113,9 +132,8 @@ colnames(crm)[1] <- c("id")
 #Convert person names to ACSII characters
 crm$person.name <- stri_trans_general(crm$person.name,"latin-ascii")
 
-crm <- merge(x = crm, y = tags, by = "id", all.x = T)
-colnames(crm)[9] <- c("tags")
-
+#crm <- merge(x = crm, y = tags, by = "id", all.x = T)
+#colnames(crm)[9] <- c("tags")
 
 
 #####################################################
@@ -326,8 +344,8 @@ crm <- merge(x = crm, y = notifications_last, by = "email", all.x = T)
 #Deal with credits
 #####################################################
 #Set the folders
-from_folder <- "/home/dima/sisense_share"
-to_folder <- "/home/dima/Automation/Reports/CRM/"
+from_folder <- "/home/bi_user/sisense_share"
+to_folder <- "/home/bi_user/Automation/Reports/CRM/"
 
 #Identify files
 list_files <- list.files(from_folder,"branch_credits.csv",full.names = T)
@@ -448,8 +466,8 @@ crm <- merge(x = crm , y = providerByCustomer, by = "customer", all.x = TRUE)
 
 
 #Write to a specific folder that is shared with another machine/server
-write.csv(crm, file="/home/dima/sisense_share/crm_full_list.csv",row.names = FALSE)
-write.csv(crm, file="/home/dima/powerbi-share/R_outputs/crm_full_list.csv",row.names = FALSE)
+#write.csv(crm, file="/home/dima/sisense_share/crm_full_list.csv",row.names = FALSE)
+write.csv(crm, file="/home/bi_user/powerbi-share/R_outputs/crm_full_list.csv",row.names = FALSE)
 
 
 
