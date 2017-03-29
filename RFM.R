@@ -1,22 +1,23 @@
 getwd()
-setwd("/home/dima/Automation/Reports/CRM")
+setwd("/home/bi_user/Automation/Reports/CRM")
 
 rm(list = ls(all=TRUE))
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 
 ####################################################################################
 #Learn how to copy files from one to another folder
 ####################################################################################
 
 #Set the folders
-from_folder <- "/home/dima/sisense_share/Exchange_rate"
-to_folder <- "/home/dima/Automation/Reports/CRM"
+from_folder <- "/home/bi_user/powerbi-share/Xchange_rate"
+to_folder <- "/home/bi_user/Automation/Reports/CRM/"
 
 #Identify files
 list_files <- list.files(from_folder,"exchange_rates.csv",full.names = T)
 
 #Copy the files
-file.copy(list_files,to_folder)
-
+file.copy(list_files,to=to_folder,overwrite = T)
 
 exchange_rate <- read.csv("exchange_rates.csv",header = T,sep = ";")
 exchange_rate <- subset(exchange_rate, exchange_rate$currency_code=="GBP")
@@ -35,10 +36,12 @@ library(dplyr)
 library(mongolite)
 library(jsonlite)
 library(ggplot2)
+library(data.table)
+library(stringr)
 
 
 #Open connection
-collection = c("intwash_orders", "intwash_customers","intwash_invoices")
+collection = c("intwash_orders", "intwash_customers","intwash_invoices","intwash_voucher_redemptions")
 
 orders <- mongo(collection = collection[1], db = "uk_live", 
                 url = "mongodb://172.31.51.215:27017",verbose = TRUE)
@@ -46,19 +49,42 @@ customers <- mongo(collection = collection[2], db="uk_live",
                    url = "mongodb://172.31.51.215:27017",verbose = TRUE )
 invoices <- mongo(collection = collection[3], db="uk_live",
                   url = "mongodb://172.31.51.215:27017",verbose = TRUE )
+#vouchers <- mongo(collection = collection[4], db="uk_live",
+#                  url = "mongodb://172.31.51.215:27017",verbose = TRUE )
 
 #Parse thru collection and find the keys 
-orders_data <- orders$find(fields = '{"_id":1,"invoice":1,"reference":1,"createdAt":1,"customer":1,"state":1,"locationIdentifier":1}')
+orders_table <- orders$find(fields = '{"_id":1,"invoice":1,"reference":1,"createdAt":1,
+                           "customer":1,"voucherCode":1,"state":1,"locationIdentifier":1,"chosenServiceClass.reference":1,
+                            "languageCode":1,"createdBy.userAgent":1}')
 
-customers <- customers$find(fields = '{"_id":1,"reference":1,"internalData.segmentation":1}')
+customers_table <- customers$find(fields = '{"reference":1,"_id":1,
+                        "internalData.segmentation":1,"person.name":1,"userAccount.email":1,
+                        "internalData.gender":1,"internalData.basketGender":1,
+                        "addresses.addressLine":1,"addresses.addressLine2":1,
+                        "addresses.zip":1,"phones.number":1,"phones.type":1,"meta.tags":1,"meta.language":1}')
 
 invoices <- invoices$find(fields = '{"_id":1,"grossTotal":1,"grossTotalWithoutDiscounts":1,"netTotal":1,"netTotalWithoutDiscounts":1}')
 
-#Rename customers
+#vouchers <- vouchers$find(fields = '{"_id":1, "campaignId":1, "blockId":1,
+#                          "modelId":1, "code":1, "customerReference":1, "reference":1}')
+
+
+
+#Flatten customers table and orders_table
+customers_table <- flatten(customers_table)
+orders_table <- flatten(orders_table)
+
+
+#Subset and rename customers
+customers <- customers_table[,c(1,8,3)]
 colnames(customers) <- c("customer","segmentation","reference")
+#Subset orders
+
+orders_data <- orders_table[,c("_id","customer","state","reference","locationIdentifier","invoice","createdAt")]
 orders_data <- merge(x=orders_data,y=customers,by="customer",all.x = TRUE)
+
 names(orders_data)
-orders_data <- orders_data[,c(9,2:8)]
+orders_data <- orders_data[,c("reference.y","_id","state","reference.x","createdAt","locationIdentifier","invoice","segmentation")]
 colnames(orders_data) <- c("customer","id","state","order","createdAt","location","invoice","segmentation")
 
 #Rename the field to merge
@@ -102,6 +128,7 @@ df <- orders_data[,c(3,5:8,13,16)]
 df <- data.table(df)
 df <- df[isvalid==1 & !is.na(GrossTotalBeforeDiscount)]
 
+
 #Subset data.table
 mydata <- df[,.(df$customer,df$GrossTotalBeforeDiscount, df$createdAt,df$isvalid)]
 
@@ -130,9 +157,9 @@ length(unique(MinMax$customer_id))
 #Assign the ratings to the data table
 ####################################################################################
 
-hist(MinMax$recency)
-hist(MinMax$frequency, xlim = c(0,30),breaks = 90)
-hist(MinMax$amount, xlim = c(0,100), breaks = 200)
+#hist(MinMax$recency)
+#hist(MinMax$frequency, xlim = c(0,30),breaks = 90)
+#hist(MinMax$amount, xlim = c(0,100), breaks = 200)
 
 
 #Create new data frame, copying customers
@@ -174,6 +201,7 @@ new_data$rankFrequencyPoints = as.numeric(paste(labelsFrequencyPoints[findInterv
 #Check thresholds
 c(quantile(new_data$frequency, probs = c(0,0.55,0.7,0.85,0.95,1)))
 
+
 #rankM 1 is lowest sales while rankM 5 is highest sales
 #new_data$rankM = cut(new_data$amount, 5, labels = F)
 breaksMon = c(quantile(new_data$amount, probs = c(0,0.3,0.5,0.7,0.9,1)))
@@ -208,7 +236,31 @@ table(new_data$names)
 #new_data = transform(new_data,score=interaction(new_data$rankR,new_data$rankF,new_data$rankM, sep = ''))
 
 
-#Write to a specific folder that is shared with another machine/server
-write.csv(new_data, file="/home/dima/sisense_share/Cohorts/RFM.csv",row.names = FALSE)
+#Add cities to new_data
+#colnames(new_data)[1] <- c("customer_id")
+#new_data <- merge(x = new_data, y = orders_data[,c("customer", "location")], by = 'customer', all.x = T)
 
+#Create city df
+orders_data <- data.table(orders_data)
+city <- orders_data[,.(min(location)), by = .(customer)]
+
+colnames(city) <- c("customer_id", "location")
+
+names(city)
+names(new_data)
+#Merge with new_data
+new_data <- merge(x = new_data, y = city, by = "customer_id", all.x = T)
+
+
+
+#Write to a specific folder that is shared with another machine/server
+
+write.csv(new_data, file="/home/bi_user/powerbi-share/R_outputs/RFM.csv",row.names = FALSE)
+
+save(customers_table,orders_table,new_data, file = "/home/bi_user/Automation/Reports/CRM/DataToCRM.dat")
+save(customers_table,orders_table,new_data, file = "/home/bi_user/Automation/Reports/Cohorts/DataToCRM.dat")
+
+save(orders_data, file = "/home/bi_user/Automation/Reports/Cohorts/DataToCohorts.dat" )
+save(orders_data, file = "/home/bi_user/Automation/Reports/Stages/DataToCohorts.dat" )
+write.csv(orders_data, file = "/home/bi_user/powerbi-share/Python_inputs/orders_data.csv",row.names = FALSE)
 
