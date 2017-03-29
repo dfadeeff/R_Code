@@ -1,11 +1,14 @@
+
 getwd()
-setwd("/home/dima/Automation/Reports/Stages")
-
-
+setwd("/home/bi_user/Automation/Reports/Stages")
+rm(list = ls(all=T))
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 
 library(mongolite)
 library(jsonlite)
 library(ggplot2)
+library(data.table)
 
 collection = c("intwash_orders", "intwash_customers")
 
@@ -20,7 +23,9 @@ orders_data <- orders$find(fields = '{"_id":1, "reference":1,"createdAt":1,"cust
 customers <- customers$find(fields = '{"_id":1,"reference":1,"internalData.segmentation":1}')
 colnames(customers) <- c("customer","segmentation","reference")
 orders_data <- merge(x=orders_data,y=customers,by="customer",all.x = TRUE)
-orders_data <- orders_data[,c(8,3:7)]
+
+#Reshuffle and subset orders_data
+orders_data <- orders_data[,c("reference.y","state","reference.x","createdAt","locationIdentifier","segmentation")]
 colnames(orders_data) <- c("customer","state","order","createdAt","location", "segmentation")
 
 #Check classes
@@ -39,6 +44,7 @@ orders_data$isvalid[which(orders_data$state %in% c("new","payment_authorisation_
 #Main function to get BOTH min and max order date and sum(isvalid), SELECT min, max where isvalid = 1 group by customer
 minmax <- orders_data[isvalid == 1, .(min(createdAt),max(createdAt),sum(isvalid)),by=.(customer,segmentation.segmentation,location)] 
 colnames(minmax) <- c("customer","segment","location","firstOrder","lastOrder","totalValidOrders")
+
 
 #Check the number of orders
 sum(minmax$totalValidOrders)
@@ -97,15 +103,17 @@ prop.table(table(minmax$stages))
 
 #Visualize
 #Barplot
-bp <- ggplot(minmax, aes(x=minmax$stages, fill=minmax$stages))+geom_bar(width = 1)
-bp
+#bp <- ggplot(minmax, aes(x=minmax$stages, fill=minmax$stages))+geom_bar(width = 1)
+#bp
 
 
 
 minmax$lifespan <- difftime(time1 = minmax$lastOrder,
                             time2 = minmax$firstOrder,
                             units = 'days')
-write.csv(minmax,"/home/dima/sisense_share/Cohorts/stages.csv",row.names = F)
+
+write.csv(minmax,"/home/bi_user/powerbi-share/R_outputs/stages.csv",row.names = F)
+save(minmax, file = "/home/bi_user/Automation/Reports/Stages/stages.dat")
 
 
 
