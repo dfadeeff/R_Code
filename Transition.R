@@ -6,7 +6,7 @@
 rm(list = ls(all=TRUE))
 getwd()
 #Set working directories
-setwd("/home/dima/Automation/Reports/Stages")
+setwd("/home/bi_user/Automation/Reports/Stages")
 
 #Load library
 library(lubridate)
@@ -187,7 +187,7 @@ colnames(grouped_by_city) <- c("customer","location")
 CombinedDT <- merge(x = CombinedDT,y = grouped_by_city, by = "customer", all.x = TRUE)
 
 
-write.csv(CombinedDT,"/home/dima/powerbi-share/R_outputs/transition.csv",row.names = F)
+write.csv(CombinedDT,"/home/bi_user/powerbi-share/R_outputs/transition.csv",row.names = F)
 
 #Sum of all customers
 sum(transition)
