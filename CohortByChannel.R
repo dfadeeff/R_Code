@@ -1,7 +1,10 @@
 
 rm(list = ls(all=TRUE))
 getwd()
-setwd("/home/dima/Automation/Reports/Cohorts")
+setwd("/home/bi_user/Automation/Reports/Cohorts")
+
+#Provide new paths to libraries
+.libPaths("/home/bi_user/R/x86_64-pc-linux-gnu-library/3.3/")
 
 library(zoo)
 library(mongolite)
@@ -29,8 +32,8 @@ df_adjust = adjust$find(query = '{"event":"submit_order"}',fields = '{"reference
 # Get Google Analytics extractor
 #####################
 #Set the folders
-from_folder <- "/home/dima/powerbi-share/R_inputs"
-to_folder <- "/home/dima/Automation/Reports/Cohorts"
+from_folder <- "/home/bi_user/powerbi-share/R_inputs"
+to_folder <- "/home/bi_user/Automation/Reports/Cohorts"
 #Identify files
 list_files <- list.files(from_folder,"ga_extractor_onefile.csv",full.names = T)
 
@@ -221,7 +224,8 @@ z$cohort[is.na(z$cohort)] <- 0
 #Check NA in z
 sum(is.na(z$cohort))
 names(z)
-write.csv(z, file = "/home/dima/powerbi-share/R_outputs/channelcohorts.csv",row.names = FALSE)
+write.csv(z, file = "/home/bi_user/powerbi-share/R_outputs/channelcohorts.csv",row.names = FALSE)
+save(nsubset,orders_table, file = "/home/bi_user/Automation/Reports/Stages/channelcohorts.dat")
 
 
 
