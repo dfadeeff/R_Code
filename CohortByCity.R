@@ -143,10 +143,11 @@ cohortCities$number <- NULL
 #Split by city to create a list
 #cohortSplit <- split(cohortCities,cohortCities$city)
 
+
 #For every city, apply brute force conversion
-#London
 cohortCities <- data.table(cohortCities)
 
+#London
 cohortLondon <- cohortCities[cohortCities$city=='gb_london']
 cohortLondon <- arrange(dcast(cohortLondon, initialcohort~round(sinceFirstOrder),value.var = "percent"),initialcohort)
 cohortLondon = data.table(cohortLondon)
